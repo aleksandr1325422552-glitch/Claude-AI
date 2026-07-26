@@ -1,0 +1,605 @@
+/**
+ * Оформление интерфейса.
+ *
+ * Шрифты только системные, картинок нет вовсе — игра обязана оставаться одним
+ * самодостаточным файлом. Панели полупрозрачные с размытием: сквозь них видно
+ * сцену, и меню не выглядит наклейкой поверх игры.
+ */
+
+:root {
+  --warm: #ffc85c;
+  --cool: #6fe0ff;
+  --danger: #ff6b7a;
+  --ink: #f4f1ff;
+  --panel: rgba(18, 16, 31, 0.78);
+  --panel-line: rgba(255, 255, 255, 0.12);
+  --radius: 22px;
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  /* Безопасные отступы для экранов с вырезом. */
+  --pad-top: max(18px, env(safe-area-inset-top));
+  --pad-bottom: max(18px, env(safe-area-inset-bottom));
+  --pad-left: max(18px, env(safe-area-inset-left));
+  --pad-right: max(18px, env(safe-area-inset-right));
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  overflow: hidden;
+  background: #0b0a14;
+  color: var(--ink);
+  font-family: var(--font);
+  /* Жесты браузера (свайп-навигация, зум) не должны мешать управлению. */
+  touch-action: none;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+/**
+ * Игровое поле обязано и занимать место в потоке, и заполнять окно целиком.
+ *
+ * Напрашивается `position: absolute; inset: 0` вместе с `height: 100%` у html
+ * и body — в обычной вкладке это работает. Но игра может быть встроена в кадр,
+ * высота которого выводится из высоты содержимого (именно так устроен хостинг
+ * страниц). Абсолютно позиционированный блок выпадает из потока и в
+ * scrollHeight не даёт ничего, а `height: 100%` внутри такого кадра замыкается
+ * сам на себя — кадр схлопывается, канвас получает нулевой размер, и вместо
+ * игры остаётся чёрный прямоугольник.
+ *
+ * Оконные единицы (`svh`) эту петлю не разрывают: внутри кадра они разрешаются
+ * в его же высоту, и всё встаёт на том значении, с которого кадр начал. Поэтому
+ * высоту в пикселях проставляет разметка — она читает высоту окна и повторяет
+ * это при каждом изменении размера. Значения ниже — только запасной вариант на
+ * случай, если скрипт по какой-то причине до этого не дошёл.
+ */
+#app {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100vh;
+  height: 100svh;
+  min-height: 480px;
+  overflow: hidden;
+}
+
+/**
+ * Сообщение о том, что игра не запустилась.
+ *
+ * Без него любая поломка на старте выглядит как чёрный прямоугольник:
+ * ошибка уходит в консоль, которую никто не открывает, и понять, сломана игра
+ * или просто не загрузилась, невозможно.
+ */
+.fatal {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  text-align: center;
+  background: #0b0a14;
+}
+
+.fatal h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--warm);
+}
+
+.fatal p {
+  max-width: 46ch;
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  opacity: 0.75;
+}
+
+.fatal code {
+  max-width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--panel-line);
+  border-radius: 12px;
+  background: #ffffff10;
+  font-size: 12.5px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  opacity: 0.85;
+}
+
+#app canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* --- HUD ------------------------------------------------------------------ */
+
+.hud {
+  position: absolute;
+  inset: 0;
+  /* Интерфейс не должен перехватывать клики — они принадлежат игре. */
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.55);
+}
+
+.hud--hidden {
+  opacity: 0;
+}
+
+.hud-top {
+  position: absolute;
+  top: var(--pad-top);
+  left: var(--pad-left);
+  right: var(--pad-right);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hud-height {
+  display: flex;
+  flex-direction: column;
+}
+
+.hud-height-value {
+  font-size: clamp(30px, 6vw, 52px);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-height-best {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-biome {
+  align-self: center;
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: rgba(12, 10, 22, 0.42);
+  border: 1px solid var(--panel-line);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  backdrop-filter: blur(8px);
+}
+
+.hud-score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.hud-score-value {
+  font-size: clamp(20px, 3.6vw, 30px);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--warm);
+}
+
+.hud-multiplier {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cool);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-bottom {
+  position: absolute;
+  left: var(--pad-left);
+  bottom: var(--pad-bottom);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hud-hearts {
+  display: flex;
+  gap: 7px;
+}
+
+.hud-heart {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px 6px 10px 10px;
+  background: var(--danger);
+  transform: rotate(45deg);
+  transition: background 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 2px 10px rgba(255, 107, 122, 0.45);
+}
+
+.hud-heart--empty {
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: none;
+  transform: rotate(45deg) scale(0.82);
+}
+
+.hud-stamina {
+  width: min(230px, 42vw);
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.42);
+  border: 1px solid var(--panel-line);
+  overflow: hidden;
+}
+
+.hud-stamina-fill {
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #7fe3c8, var(--cool));
+  transition: width 0.12s linear, background 0.3s ease;
+}
+
+.hud-stamina-fill--low {
+  background: linear-gradient(90deg, #ff9d5c, var(--danger));
+}
+
+.hud-warning {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--pad-bottom) + 54px);
+  transform: translateX(-50%);
+  padding: 9px 22px;
+  border-radius: 999px;
+  background: rgba(255, 74, 92, 0.16);
+  border: 1px solid rgba(255, 107, 122, 0.55);
+  color: #ffd4d9;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.hud-warning--on {
+  opacity: 1;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.8; }
+  50% { transform: translateX(-50%) scale(1.06); opacity: 1; }
+}
+
+.hud-toasts {
+  position: absolute;
+  top: 22%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.hud-toast {
+  padding: 10px 24px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  font-size: 16px;
+  font-weight: 800;
+  white-space: nowrap;
+  backdrop-filter: blur(10px);
+  animation: toast 2.4s ease forwards;
+}
+
+.hud-toast--good { color: var(--warm); border-color: rgba(255, 200, 92, 0.5); }
+.hud-toast--biome { color: var(--cool); border-color: rgba(111, 224, 255, 0.45); }
+
+@keyframes toast {
+  0% { opacity: 0; transform: translateY(14px) scale(0.94); }
+  14% { opacity: 1; transform: translateY(0) scale(1); }
+  76% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-16px) scale(0.97); }
+}
+
+/* --- Экраны --------------------------------------------------------------- */
+
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: radial-gradient(circle at 50% 40%, rgba(10, 8, 20, 0.35), rgba(6, 5, 14, 0.82));
+  backdrop-filter: blur(6px);
+  transition: opacity 0.28s ease;
+  z-index: 10;
+}
+
+.screen--hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.panel {
+  width: min(460px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 30px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(18px);
+  text-align: center;
+  animation: rise 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(18px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(46px, 12vw, 76px);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  background: linear-gradient(180deg, #fff 0%, var(--warm) 60%, #ff9d5c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.subtitle {
+  margin: 10px 0 22px;
+  font-size: 15px;
+  opacity: 0.62;
+}
+
+.panel-title {
+  margin: 0 0 20px;
+  font-size: 27px;
+  font-weight: 800;
+}
+
+.record {
+  display: flex;
+  justify-content: center;
+  gap: 22px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  opacity: 0.75;
+}
+
+.record b {
+  color: var(--warm);
+  font-variant-numeric: tabular-nums;
+}
+
+.button {
+  display: block;
+  width: 100%;
+  margin: 9px 0;
+  padding: 15px 22px;
+  border: 1px solid var(--panel-line);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  /* Экран перехватывает указатель, но сам HUD — нет; кнопкам он нужен. */
+  pointer-events: auto;
+  transition: transform 0.14s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.button:hover {
+  background: rgba(255, 255, 255, 0.13);
+  transform: translateY(-2px);
+}
+
+.button:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.button--primary {
+  background: linear-gradient(135deg, var(--warm), #ff9d5c);
+  border-color: transparent;
+  color: #2a1b06;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.button--primary:hover {
+  background: linear-gradient(135deg, #ffd47a, #ffab6e);
+}
+
+.button--ghost {
+  background: transparent;
+  opacity: 0.7;
+}
+
+.controls {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--panel-line);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.controls-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13.5px;
+  opacity: 0.78;
+}
+
+.controls-row span {
+  text-align: left;
+}
+
+kbd {
+  flex: 0 0 auto;
+  min-width: 78px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--panel-line);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.hint {
+  margin: 16px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  opacity: 0.5;
+}
+
+.badge {
+  display: inline-block;
+  margin-bottom: 14px;
+  padding: 7px 18px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--warm), #ff9d5c);
+  color: #2a1b06;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  animation: badge 1.6s ease-in-out infinite;
+}
+
+@keyframes badge {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.stats {
+  display: flex;
+  justify-content: space-around;
+  gap: 12px;
+  margin: 22px 0 16px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.stat-value {
+  font-size: clamp(20px, 5vw, 27px);
+  font-weight: 800;
+  color: var(--warm);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.5;
+}
+
+.reached {
+  margin: 0 0 18px;
+  font-size: 13.5px;
+  opacity: 0.7;
+}
+
+.reached b {
+  color: var(--cool);
+}
+
+/* --- Сенсорное управление -------------------------------------------------- */
+
+.touch-controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.touch-stick {
+  position: absolute;
+  width: 104px;
+  height: 104px;
+  margin: -52px 0 0 -52px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.touch-knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.touch-button {
+  position: absolute;
+  bottom: calc(var(--pad-bottom) + 16px);
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 26px;
+  font-weight: 800;
+  pointer-events: auto;
+  backdrop-filter: blur(6px);
+}
+
+.touch-button:active {
+  background: rgba(255, 255, 255, 0.26);
+  transform: scale(0.94);
+}
+
+.touch-jump { right: calc(var(--pad-right) + 16px); }
+.touch-dash { right: calc(var(--pad-right) + 106px); bottom: calc(var(--pad-bottom) + 34px); width: 64px; height: 64px; font-size: 22px; }
+
+@media (max-width: 520px) {
+  .panel { padding: 24px 20px; }
+  .hud-stamina { width: 46vw; }
+  .controls-row { font-size: 12.5px; }
+  kbd { min-width: 66px; }
+}
+
+/* Пользователь мог попросить систему не анимировать — уважаем это. */
+@media (prefers-reduced-motion: reduce) {
+  .hud-warning--on,
+  .badge { animation: none; }
+  .panel { animation: none; }
+}
