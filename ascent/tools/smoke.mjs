@@ -19,6 +19,23 @@ import { fileURLToPath } from 'node:url'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const dist = join(root, 'dist')
 
+/**
+ * Можно прогнать не обычную сборку, а вариант для хостинга страниц-артефактов:
+ *
+ *   node tools/smoke.mjs --artifact
+ *
+ * Он отдаётся без собственных doctype и meta — их добавляет хостинг. Проверять
+ * его отдельно обязательно: без объявления кодировки кириллица в интерфейсе
+ * может развалиться, и заметить это можно только в живом браузере.
+ */
+const asArtifact = process.argv.includes('--artifact')
+
+/** Каркас документа, в который хостинг оборачивает содержимое страницы. */
+const wrapArtifact = (inner) =>
+  `<!doctype html><html lang="ru"><head><meta charset="utf-8">` +
+  `<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">` +
+  `</head><body>${inner}</body></html>`
+
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -37,6 +54,14 @@ const server = createServer(async (req, res) => {
   }
 
   try {
+    if (asArtifact && path === '/index.html') {
+      const inner = await readFile(join(dist, 'ввысь-артефакт.html'), 'utf8')
+      // Заголовок Content-Type намеренно без charset: так проверяется, что
+      // страница переживает хостинг, который кодировку не объявляет.
+      res.writeHead(200, { 'Content-Type': 'text/html' })
+      res.end(wrapArtifact(inner))
+      return
+    }
     const body = await readFile(join(dist, path))
     res.writeHead(200, { 'Content-Type': TYPES[extname(path)] ?? 'application/octet-stream' })
     res.end(body)

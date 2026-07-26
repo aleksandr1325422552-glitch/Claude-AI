@@ -42,13 +42,28 @@ const body = html
   .replace(/<link[^>]+rel="(stylesheet|modulepreload)"[^>]*>/g, '')
   .trim()
 
-// Кодировку объявляем первой строкой: если хостинг отдаст файл без charset в
-// заголовке, браузер всё равно прочитает кириллицу правильно.
-const out = `<!doctype html>
+/**
+ * Режим для хостинга страниц-артефактов.
+ *
+ * Там разметку оборачивают в собственный каркас документа, поэтому свои
+ * doctype, meta и body отдавать нельзя — они окажутся вложенными в чужие и
+ * будут выброшены разборщиком вместе с содержимым. Заголовок оставляем: по
+ * нему страница называется во вкладке и в галерее.
+ */
+const forArtifact = process.argv.includes('--artifact')
+const args = process.argv.slice(2).filter((a) => !a.startsWith('--'))
+
+const head = forArtifact
+  ? '<title>Ввысь — бесконечный подъём</title>'
+  : `<!doctype html>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
 <meta name="theme-color" content="#12101f" />
-<title>Ввысь — бесконечный подъём</title>
+<title>Ввысь — бесконечный подъём</title>`
+
+// Кодировку объявляем первой строкой: если хостинг отдаст файл без charset в
+// заголовке, браузер всё равно прочитает кириллицу правильно.
+const out = `${head}
 ${style ? `<style>\n${escapeForStyle(style)}\n</style>` : ''}
 
 ${body}
@@ -58,7 +73,7 @@ ${escapeForScript(script)}
 </script>
 `
 
-const target = process.argv[2] ? resolve(process.argv[2]) : join(dist, 'ввысь.html')
+const target = args[0] ? resolve(args[0]) : join(dist, forArtifact ? 'ввысь-артефакт.html' : 'ввысь.html')
 await writeFile(target, out, 'utf8')
 
 const kb = (n) => `${(n / 1024).toFixed(1)} КБ`
