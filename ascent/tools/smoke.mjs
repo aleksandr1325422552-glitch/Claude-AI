@@ -179,11 +179,49 @@ const squeezed = await page.evaluate(() => {
 })
 stats.squeezed = `содержимое ${squeezed.content}px, поле ${squeezed.app}px`
 
+/**
+ * Проверка запуска при запрещённых возможностях браузера.
+ *
+ * Встроенный кадр раздаёт возможности политикой разрешений, и закрытая
+ * возможность ведёт себя коварно: метод на месте, проверка на его наличие
+ * проходит, а вызов бросает SecurityError. Именно так игра и падала целиком
+ * из-за опроса геймпадов — на экране был чёрный прямоугольник без объяснений.
+ *
+ * Подменяем такие методы на бросающие и требуем, чтобы игра всё равно
+ * запустилась: ни одна необязательная возможность не вправе ронять запуск.
+ */
+const blockedPage = await browser.newPage({ viewport: { width: 1280, height: 720 } })
+const blockedErrors = []
+blockedPage.on('pageerror', (e) => blockedErrors.push(e.message))
+
+await blockedPage.addInitScript(() => {
+  const deny = (name) => {
+    throw new DOMException(
+      `Access to the feature "${name}" is disallowed by permissions policy.`,
+      'SecurityError',
+    )
+  }
+  Object.defineProperty(navigator, 'getGamepads', { value: () => deny('gamepad'), configurable: true })
+})
+
+await blockedPage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'load' })
+await blockedPage.waitForTimeout(2500)
+
+const blocked = await blockedPage.evaluate(() => ({
+  канвас: !!document.querySelector('canvas'),
+  экранОшибки: document.querySelector('.fatal')?.textContent?.slice(0, 120) ?? null,
+}))
+await blockedPage.close()
+
 await browser.close()
 server.close()
 
 console.log('Показатели после прогона:')
 for (const [key, value] of Object.entries(stats)) console.log(`  ${key}: ${value}`)
+
+console.log('\nПри запрещённых возможностях браузера:')
+console.log(`  канвас: ${blocked.канвас ? 'есть' : 'НЕТ'}`)
+console.log(`  экран ошибки: ${blocked.экранОшибки ?? 'нет'}`)
 
 if (errors.length) {
   console.error(`\nОшибок в браузере: ${errors.length}`)
@@ -206,6 +244,19 @@ if (stats.contentHeight < 400) {
 
 if (!/^[1-9]/.test(stats.appSize)) {
   console.error(`\nКонтейнер игры нулевого размера (${stats.appSize}).`)
+  process.exit(1)
+}
+
+if (!blocked.канвас) {
+  console.error('\nПри запрещённой возможности браузера игра не запустилась.')
+  if (blocked.экранОшибки) console.error(`Экран ошибки: ${blocked.экранОшибки}`)
+  console.error('Ни одна необязательная возможность не должна ронять запуск.')
+  process.exit(1)
+}
+
+if (blockedErrors.length) {
+  console.error('\nПри запрещённой возможности браузера возникли ошибки:')
+  for (const e of [...new Set(blockedErrors)].slice(0, 5)) console.error(`  • ${e}`)
   process.exit(1)
 }
 

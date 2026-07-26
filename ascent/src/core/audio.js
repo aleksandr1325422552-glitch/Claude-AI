@@ -41,12 +41,25 @@ export function createAudio() {
   let musicTimer = null
   let musicStep = 0
 
+  /** Звук отключён насовсем: браузер не дал его создать. */
+  let unavailable = false
+
   function ensure() {
     if (ctx) return ctx
+    if (unavailable) return null
+
     const Ctx = window.AudioContext || window.webkitAudioContext
     if (!Ctx) return null
 
-    ctx = new Ctx()
+    try {
+      ctx = new Ctx()
+    } catch {
+      // Во встроенном кадре звук может быть закрыт политикой разрешений, и
+      // тогда создание контекста бросает исключение, а не возвращает пустоту.
+      // Игра обязана пережить это молча: беззвучная игра лучше упавшей.
+      unavailable = true
+      return null
+    }
 
     master = ctx.createGain()
     master.gain.value = muted ? 0 : 0.8

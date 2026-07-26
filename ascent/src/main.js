@@ -48,8 +48,18 @@ function fitToWindow() {
   container.style.height = `${height}px`
 }
 
-/** Показывает причину, по которой игра не запустилась. */
-function showFatal(detail) {
+/**
+ * Показывает причину, по которой игра не запустилась.
+ *
+ * Текст подбирается под настоящую причину, а не под самую вероятную. Первая
+ * версия этого экрана всегда винила WebGL — и, когда игра упала совсем по
+ * другому поводу, увела расследование в сторону. Догадка, поданная как
+ * диагноз, хуже отсутствия диагноза.
+ *
+ * @param {'webgl'|'startup'} reason
+ * @param {string} [detail] Текст исходной ошибки — он и есть самое ценное.
+ */
+function showFatal(reason, detail) {
   container.innerHTML = ''
 
   const box = document.createElement('div')
@@ -60,10 +70,13 @@ function showFatal(detail) {
 
   const text = document.createElement('p')
   text.textContent =
-    'Браузер не смог включить трёхмерную графику (WebGL). Так бывает, когда ' +
-    'страница открыта во встроенном окне с ограничениями, при отключённом ' +
-    'аппаратном ускорении или на очень старом браузере. Попробуйте открыть ' +
-    'страницу в отдельной вкладке.'
+    reason === 'webgl'
+      ? 'Браузер не смог включить трёхмерную графику (WebGL). Так бывает при ' +
+        'отключённом аппаратном ускорении, на очень старом браузере или во ' +
+        'встроенном окне с ограничениями. Попробуйте открыть страницу в ' +
+        'отдельной вкладке.'
+      : 'Что-то помешало запуску — текст ошибки ниже. Если страница открыта во ' +
+        'встроенном окне, попробуйте открыть её в отдельной вкладке.'
 
   box.append(heading, text)
 
@@ -98,13 +111,12 @@ fitToWindow()
 window.addEventListener('resize', fitToWindow)
 
 if (!webglSupported()) {
-  showFatal('WebGL недоступен')
+  showFatal('webgl', 'WebGL недоступен')
 } else {
   try {
     start()
   } catch (error) {
-    // Сюда попадают и отказ видеокарты, и любая ошибка при сборке сцены.
-    showFatal(error instanceof Error ? `${error.name}: ${error.message}` : String(error))
+    showFatal('startup', error instanceof Error ? `${error.name}: ${error.message}` : String(error))
     throw error
   }
 }

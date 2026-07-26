@@ -100,9 +100,28 @@ export function createInput(target = window) {
     return { x, y }
   }
 
+  /**
+   * Опрос геймпада может быть запрещён политикой разрешений.
+   *
+   * Во встроенном кадре доступ к геймпадам нередко закрыт, и тогда обращение к
+   * `navigator.getGamepads()` не возвращает пустой список, а бросает
+   * SecurityError. Наличие метода при этом ни о чём не говорит — он есть,
+   * просто вызывать его нельзя. Запоминаем отказ и больше не пробуем: иначе
+   * исключение повторялось бы шестьдесят раз в секунду.
+   */
+  let gamepadsBlocked = false
+
   function pollGamepad() {
-    if (!navigator.getGamepads) return null
-    const pads = navigator.getGamepads()
+    if (gamepadsBlocked || !navigator.getGamepads) return null
+
+    let pads
+    try {
+      pads = navigator.getGamepads()
+    } catch {
+      gamepadsBlocked = true
+      return null
+    }
+
     for (const pad of pads) {
       if (!pad || !pad.connected) continue
 
