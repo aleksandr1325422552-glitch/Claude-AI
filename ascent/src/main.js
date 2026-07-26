@@ -46,6 +46,9 @@ audio.setMusic(save.settings.music ?? true)
 
 const collision = createCollisionWorld()
 const tower = createTower(view.scene, collision, { seed: 'ввысь' })
+// Башня строится вперёд по высоте, поэтому красить её надо палитрой той
+// высоты, где сегмент окажется. Ссылку на состояние палитры отдаём сразу.
+tower.prime(view.palette.state)
 const player = createPlayer(view.scene, { fx, audio, camera: cameraRig })
 const enemies = createEnemies(view.scene)
 const pickups = createPickups(view.scene)
@@ -190,13 +193,51 @@ let fps = 60
 
 const focusPoint = new THREE.Vector3()
 
+/**
+ * Разбирает очередь появления, накопленную генератором.
+ *
+ * Генератор не создаёт врагов и пикапы сам — он только помечает места. Так
+ * мир и его обитатели остаются независимы: башню можно перегенерировать, не
+ * трогая пулы, а пулы — очистить, не разбирая башню.
+ */
+function drainSpawnQueue() {
+  const queue = tower.spawnQueue
+  if (!queue.length) return
+  for (const point of queue) {
+    if (point.type === 'enemy') enemies.spawn(point.kind, point)
+    else pickups.spawn(point.kind, point)
+  }
+  queue.length = 0
+}
+
+/** Отмечает пройденные контрольные точки. */
+function checkCheckpoints() {
+  for (const checkpoint of tower.checkpoints) {
+    if (checkpoint.reached) continue
+    // Засчитываем по высоте и близости: перепрыгнувший маяк по касательной
+    // игрок всё равно заслужил передышку.
+    if (player.position.y < checkpoint.y - 1) continue
+    const dx = player.position.x - checkpoint.x
+    const dz = player.position.z - checkpoint.z
+    if (Math.hypot(dx, dz) > 8) continue
+
+    checkpoint.reached = true
+    checkpoint.beacon?.activate()
+    events.emit('checkpoint', { position: player.position })
+  }
+}
+
 function step(dt) {
   run.time += dt
 
   player.update(input, world, dt)
+  tower.tick(dt)
   tower.update(player.position.y, dt)
   hazard.update(player.position.y, dt)
   world.hazardY = hazard.y
+
+  drainSpawnQueue()
+  checkCheckpoints()
 
   enemies.update(player, world, dt)
   pickups.update(player, world, dt)
@@ -265,6 +306,7 @@ function frame(now) {
   )
 
   fx.update(dt)
+  hazard.setHorizon(palette.fog)
   audio.setDanger(hazard.danger)
 
   hud.update({

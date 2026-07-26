@@ -136,7 +136,9 @@ function createClouds(layers = 7, perLayer = 9) {
   for (let layer = 0; layer < layers; layer++) {
     const ring = new THREE.Group()
     ring.userData.speed = rng.range(0.008, 0.03) * (rng.chance(0.5) ? 1 : -1)
-    ring.userData.baseY = layer * 240 + rng.range(-40, 40)
+    // Нижний ярус поднят над стартом: облако на уровне глаз в первые секунды
+    // читается не как облако, а как белая клякса поперёк кадра.
+    ring.userData.baseY = 170 + layer * 240 + rng.range(-40, 40)
 
     for (let i = 0; i < perLayer; i++) {
       const cloud = new THREE.Group()
