@@ -141,14 +141,43 @@ await page.waitForTimeout(600)
 
 const stats = await page.evaluate(() => {
   const canvas = document.querySelector('canvas')
+  const app = document.querySelector('#app')
   return {
     biome: document.querySelector('.hud-biome')?.textContent ?? '',
     score: document.querySelector('.hud-score-value')?.textContent ?? '',
     canvasSize: canvas ? `${canvas.width}×${canvas.height}` : 'нет канваса',
+    appSize: app ? `${app.clientWidth}×${app.clientHeight}` : 'нет контейнера',
+    // Высота содержимого документа. Хостинг страниц выводит из неё высоту
+    // кадра, поэтому ноль здесь означает схлопнутый кадр и чёрный экран —
+    // поломку, которую не видно ни по одной ошибке в консоли.
+    contentHeight: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight),
   }
 })
 stats.peakHeight = `${peakHeight.toFixed(1)} м`
 stats.sawPositiveHeight = sawPositiveHeight
+
+/**
+ * Проверка на схлопывание во встроенном кадре.
+ *
+ * Кадр без заданной высоты стартует со 150 пикселей и растёт до высоты
+ * содержимого. Если игра выводит свою высоту из высоты окна, она соглашается
+ * на эти 150 и остаётся полоской навсегда — замкнутый круг, из которого нечему
+ * её вытолкнуть. Сжимаем окно до этой высоты и смотрим, устоит ли вёрстка.
+ *
+ * Без этой проверки предыдущая версия проходила дымовой прогон: в окне
+ * 1280×720 высота приходила снаружи, и разницы между рабочей и схлопнутой
+ * вёрсткой не было видно.
+ */
+await page.setViewportSize({ width: 1280, height: 150 })
+await page.waitForTimeout(500)
+const squeezed = await page.evaluate(() => {
+  const app = document.querySelector('#app')
+  return {
+    content: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight),
+    app: app ? app.clientHeight : 0,
+  }
+})
+stats.squeezed = `содержимое ${squeezed.content}px, поле ${squeezed.app}px`
 
 await browser.close()
 server.close()
@@ -164,6 +193,25 @@ if (errors.length) {
 
 if (!sawPositiveHeight) {
   console.error('\nВысота ни разу не выросла — забег, похоже, не начался.')
+  process.exit(1)
+}
+
+// Порог с запасом ниже окна прогона: важно поймать схлопывание в ноль, а не
+// придираться к десяткам пикселей.
+if (stats.contentHeight < 400) {
+  console.error(`\nВысота содержимого документа ${stats.contentHeight}px — во встроенном кадре`)
+  console.error('игра схлопнется в полоску и покажет чёрный экран.')
+  process.exit(1)
+}
+
+if (!/^[1-9]/.test(stats.appSize)) {
+  console.error(`\nКонтейнер игры нулевого размера (${stats.appSize}).`)
+  process.exit(1)
+}
+
+if (squeezed.content < 400 || squeezed.app < 400) {
+  console.error(`\nВ узком окне вёрстка схлопнулась: ${stats.squeezed}.`)
+  console.error('Во встроенном кадре, который стартует со 150 пикселей, игра останется полоской.')
   process.exit(1)
 }
 

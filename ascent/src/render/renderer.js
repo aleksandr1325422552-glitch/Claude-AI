@@ -27,11 +27,26 @@ export function detectQuality() {
 }
 
 /**
+ * Размер игрового поля.
+ *
+ * Спрашиваем контейнер, но не верим ему безоговорочно: во встроенном кадре он
+ * вполне может сообщить ноль, пока вёрстка ещё не устоялась. Нулевой размер
+ * даёт вырожденную матрицу проекции и чёрный экран без единой ошибки в консоли
+ * — то есть поломку, которую нечем заметить. Окно в такой ситуации честнее.
+ */
+function viewportSize(container) {
+  const width = container.clientWidth || window.innerWidth || 1
+  const height = container.clientHeight || window.innerHeight || 1
+  return { width, height }
+}
+
+/**
  * @param {HTMLElement} container Куда вставить канвас.
  * @param {keyof QUALITY} qualityName
  */
 export function createRenderer(container, qualityName = 'high') {
   const quality = QUALITY[qualityName] ?? QUALITY.high
+  const initial = viewportSize(container)
 
   const renderer = new THREE.WebGLRenderer({
     antialias: qualityName !== 'low',
@@ -39,7 +54,7 @@ export function createRenderer(container, qualityName = 'high') {
     stencil: false,
   })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, quality.pixelRatio))
-  renderer.setSize(container.clientWidth, container.clientHeight)
+  renderer.setSize(initial.width, initial.height)
   renderer.outputColorSpace = THREE.SRGBColorSpace
   // ACES слишком «киношный» для мультяшной картинки — гасит насыщенность.
   // Линейный маппинг с лёгкой экспозицией оставляет цвета такими, как в палитре.
@@ -52,7 +67,7 @@ export function createRenderer(container, qualityName = 'high') {
   const scene = new THREE.Scene()
   scene.fog = new THREE.FogExp2(0xffd9a8, 0.0042)
 
-  const camera = new THREE.PerspectiveCamera(58, container.clientWidth / container.clientHeight, 0.1, 1200)
+  const camera = new THREE.PerspectiveCamera(58, initial.width / initial.height, 0.1, 1200)
   camera.position.set(0, 6, 14)
 
   const palette = createPalette()
@@ -133,8 +148,7 @@ export function createRenderer(container, qualityName = 'high') {
   }
 
   function resize() {
-    const w = container.clientWidth
-    const h = container.clientHeight
+    const { width: w, height: h } = viewportSize(container)
     camera.aspect = w / h
     camera.updateProjectionMatrix()
     renderer.setSize(w, h)
