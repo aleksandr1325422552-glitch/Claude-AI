@@ -1,0 +1,24 @@
+{
+  "name": "monster-farm",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Ферма Чудес — клон Весёлой фермы на Three.js с девушками и монстрами",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test \"tests/**/*.test.js\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://local_proxy@127.0.0.1:41729/git/aleksandr1325422552-glitch/Claude-AI"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "vite": "^8.1.5"
+  }
+}

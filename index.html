@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>Ферма Чудес — девушки и монстры</title>
+    <meta name="description" content="Клон Весёлой фермы на Three.js: разводите фей, русалок, ведьм, слизней, дракончиков и грифонов." />
+    <meta name="theme-color" content="#6cbf59" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%236cbf59'/%3E%3Ccircle cx='32' cy='24' r='11' fill='%23fdf1d8'/%3E%3Cpath d='M14 52c0-9 8-16 18-16s18 7 18 16z' fill='%23ffc0e0'/%3E%3Ccircle cx='27' cy='23' r='2.6' fill='%233a2415'/%3E%3Ccircle cx='37' cy='23' r='2.6' fill='%233a2415'/%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="scene"></canvas>
+
+      <!-- ============ Верхняя панель ============ -->
+      <header id="topbar" class="hud">
+        <div class="pill pill--coins" title="Монеты">
+          <span class="pill__icon">🪙</span>
+          <span class="pill__value" id="ui-coins">0</span>
+        </div>
+
+        <div class="pill" id="ui-water-pill" title="Вода в лейке — кликните колодец, чтобы набрать">
+          <span class="pill__icon">💧</span>
+          <span class="pill__value"><b id="ui-water">0</b>/<span id="ui-water-max">0</span></span>
+        </div>
+
+        <div class="pill" id="ui-store-pill" title="Склад">
+          <span class="pill__icon">📦</span>
+          <span class="pill__value"><b id="ui-store">0</b>/<span id="ui-store-max">0</span></span>
+        </div>
+
+        <div class="pill" id="ui-cage-pill" title="Клетка для тёмных тварей — кликните, чтобы продать в цирк">
+          <span class="pill__icon">🪤</span>
+          <span class="pill__value"><b id="ui-cage">0</b>/<span id="ui-cage-max">0</span></span>
+        </div>
+
+        <div class="goals" id="ui-goals"></div>
+
+        <div class="pill pill--timer" id="ui-timer-pill" title="Время до конца уровня">
+          <span class="pill__icon">⏳</span>
+          <span class="pill__value" id="ui-timer">0:00</span>
+        </div>
+
+        <div class="topbar__buttons">
+          <button class="iconbtn" id="btn-help" title="Как играть (H)">❓</button>
+          <button class="iconbtn" id="btn-sound" title="Звук (M)">🔊</button>
+          <button class="iconbtn" id="btn-pause" title="Пауза (Esc / Space)">⏸</button>
+        </div>
+      </header>
+
+      <!-- ============ Левая колонка построек ============ -->
+      <nav id="sidebar" class="hud">
+        <button class="bigbtn" id="btn-market">
+          <span class="bigbtn__icon">🛒</span><span class="bigbtn__label">Рынок</span>
+        </button>
+        <button class="bigbtn" id="btn-nursery">
+          <span class="bigbtn__icon">🥚</span><span class="bigbtn__label">Питомник</span>
+        </button>
+        <button class="bigbtn" id="btn-roster">
+          <span class="bigbtn__icon">🧾</span><span class="bigbtn__label">Хозяйство</span>
+        </button>
+      </nav>
+
+      <!-- ============ Нижняя панель: склад + фургон ============ -->
+      <footer id="bottombar" class="hud">
+        <div class="bay bay--store">
+          <div class="bay__title">Склад <span class="bay__hint">кликните товар → в фургон</span></div>
+          <div class="slots" id="ui-store-slots"></div>
+        </div>
+        <div class="bay bay--truck">
+          <div class="bay__title">Фургон <span class="bay__hint" id="ui-truck-state"></span></div>
+          <div class="slots slots--truck" id="ui-truck-slots"></div>
+          <button class="sendbtn" id="btn-send-truck">Отправить на рынок</button>
+        </div>
+      </footer>
+
+      <!-- ============ Всплывающие подсказки / тосты ============ -->
+      <div id="toasts"></div>
+      <div id="tooltip" class="tooltip" hidden></div>
+
+      <!-- ============ Модальные окна ============ -->
+      <div id="modal" class="modal" hidden>
+        <div class="modal__backdrop" data-close="1"></div>
+        <div class="modal__box" role="dialog" aria-modal="true">
+          <button class="modal__x" data-close="1" aria-label="Закрыть">✕</button>
+          <h2 class="modal__title" id="modal-title"></h2>
+          <div class="modal__body" id="modal-body"></div>
+          <div class="modal__foot" id="modal-foot"></div>
+        </div>
+      </div>
+
+      <div id="loading">
+        <div class="loading__inner">
+          <div class="loading__spinner"></div>
+          <p>Ферма просыпается…</p>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
